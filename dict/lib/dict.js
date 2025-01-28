@@ -85,6 +85,16 @@ export class Dictionary {
         return shard.get(entry % this.#index.shardSize)
     }
 
+    autocomplete(term, limit = -1, normalized = false) {
+        if (!normalized) {
+            term = Dictionary.normalize(term)
+        }
+        if (!term.length){
+            return []
+        }
+        return this.#index.lookupPrefix(term, limit)
+    }
+
     static normalize(term) {
         let n = ""
         let lastS = true // trim leading whitespace
@@ -269,6 +279,7 @@ export class DictionaryIndex {
     /** @type {Uint8Array[]} */ #bucketWords
     /** @type {DataView[]}   */ #bucketIndexes
     /** @type {TextEncoder}  */ #enc
+    /** @type {TextDecoder}  */ #dec
 
     constructor(buf) {
         const b = wrapBuffer(buf)
@@ -290,6 +301,7 @@ export class DictionaryIndex {
             this.#bucketCounts.length,
         )
         this.#enc = new TextEncoder()
+        this.#dec = new TextDecoder()
     }
 
     lookup(term) {
@@ -326,6 +338,51 @@ export class DictionaryIndex {
             es[i-lo] = indexes.getUint32(i*4)
         }
         return es
+    }
+
+    lookupPrefix(term, limit = -1) {
+        const arr = this.#enc.encode(term)
+        const len = arr.length
+        if (len >= this.#bucketCounts.length) {
+            return []
+        }
+
+        const ws = []
+        for (let len1 = len; len1 <= this.#bucketCounts.length; len1++) {
+            const bucket = len1-1
+            const count = this.#bucketCounts[bucket]
+            const words = this.#bucketWords[bucket]
+
+            const [lo, hi] = binarySearchRange(count, i => {
+                for (let c = 0; c < len; c++) {
+                    const x = arr[c]
+                    const y = words[i*len1 + c]
+                    if (x < y) {
+                        return -1
+                    }
+                    if (x > y) {
+                        return 1
+                    }
+                }
+                return 0
+            })
+            if (lo === -1) {
+                continue
+            }
+
+            let last
+            for (let i = lo; i <= hi; i++) {
+                const w = this.#dec.decode(words.slice(i*len1, i*len1 + len1))
+                if (last !== w) {
+                    ws.push(w)
+                }
+                if (ws.length == limit) {
+                    return ws
+                }
+                last = w
+            }
+        }
+        return ws
     }
 
     get shardSize() {

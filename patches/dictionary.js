@@ -39,6 +39,23 @@ var Dictionary = (function() {
     }
 
     /**
+     * Raw HTML.
+     */
+    function rawHTML(s) {
+        return Object.defineProperties(new String(s), {
+            [isHtml]: {
+                value: true,
+            },
+        })
+    }
+
+    /**
+     * Material Icons Rounded
+     */
+    const matIconSearch = rawHTML(`<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#e8eaed"><path d="M0 0h24v24H0z" fill="none"/><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>`)
+    const matIconClose = rawHTML(`<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#e8eaed"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18.3 5.71c-.39-.39-1.02-.39-1.41 0L12 10.59 7.11 5.7c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41L10.59 12 5.7 16.89c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L12 13.41l4.89 4.89c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L13.41 12l4.89-4.89c.38-.38.38-1.02 0-1.4z"/></svg>`)
+
+    /**
      * Escapes a string for use in HTML.
      */
     function escape(str) {
@@ -88,6 +105,7 @@ var Dictionary = (function() {
         #content
         #pos
         #posRect
+        #expand
         constructor(css = undefined) {
             this.#root = document.createElement("x-popup")
 
@@ -135,6 +153,14 @@ var Dictionary = (function() {
                 #inner::-webkit-scrollbar {
                     display: none;
                 }
+                #wrapper.expand {
+                    display: flex;
+                    flex-direction: column;
+                }
+                #wrapper.expand #popup {
+                    flex: 1;
+                    max-height: none;
+                }
             `)
 
             this.#cssExtra = new CSSStyleSheet()
@@ -161,6 +187,8 @@ var Dictionary = (function() {
                 this.#popup.style.setProperty("box-shadow", dark ? "none" : "0 0 8px 0 rgba(0, 0, 0, .25)")
                 this.#popup.style.setProperty("background-color", bg !== undefined ? bg : dark ? "#333" : "#fff")
                 this.#popup.style.setProperty("color", fg !== undefined ? fg : dark ? "#eee" : "#000")
+                this.#popup.style.setProperty("--popup-background", bg !== undefined ? bg : dark ? "#333" : "#fff")
+                this.#popup.style.setProperty("--popup-border-color", dark ? "rgba(255, 255, 255, .25)" : "rgba(0, 0, 0, .25)")
             }
             applyTheme()
 
@@ -224,6 +252,15 @@ var Dictionary = (function() {
         }
 
         /**
+         * Expands the popup to fill the screen if it's visible. Reset upon the
+         * next call to hide.
+         */
+        expand() {
+            this.#expand = true
+            this.move()
+        }
+
+        /**
          * Hides the popup if it is visible.
          */
         hide() {
@@ -231,6 +268,7 @@ var Dictionary = (function() {
                 this.#root.remove()
                 this.#pos = false
                 this.#posRect = undefined
+                this.#expand = false
             }
         }
 
@@ -239,7 +277,10 @@ var Dictionary = (function() {
          */
         move() {
             let top, bot
-            if (this.#posRect === undefined) {
+            if (this.#expand) {
+                top = 0
+                bot = 0
+            } else if (this.#posRect === undefined) {
                 if (this.#pos) {
                     top = 0
                 } else {
@@ -261,6 +302,11 @@ var Dictionary = (function() {
                     }
                 }
             }
+            if (this.#expand) {
+                this.#wrapper.classList.add("expand")
+            } else {
+                this.#wrapper.classList.remove("expand")
+            }
             this.#wrapper.style.setProperty("top", top === undefined ? "auto" : `${top}px`, "important")
             this.#wrapper.style.setProperty("bottom", bot === undefined ? "auto" : `${bot}px`, "important")
         }
@@ -277,6 +323,13 @@ var Dictionary = (function() {
          */
         get shadowRoot() {
             return this.#shadow
+        }
+
+        /**
+         * Whether the popup is currently expanded.
+         */
+        get expanded() {
+            return !!this.#expand
         }
     }
 
@@ -349,6 +402,17 @@ var Dictionary = (function() {
                 this.#deepSelectionRoot.addEventListener("pointerout", this.#_handleDeepPointerDel, false)
                 this.#deepSelectionRoot.addEventListener("click", this.#_handleDeepClick, false)
                 // yes, we don't want handleDeepPointerAdd for pointerenter
+            }
+        }
+
+        /**
+         * Clears the current selection. Does not call rangeCleared.
+         */
+        clear() {
+            const sel = document.getSelection()
+            if (sel?.rangeCount) {
+                sel?.empty?.()
+                sel?.removeAllRanges?.()
             }
         }
 
@@ -484,6 +548,68 @@ var Dictionary = (function() {
         }
     }
 
+    const createAutocompleteSearch = (el, normalize, autocomplete, search) => {
+        const input = el.querySelector("input")
+        const ul = el.querySelector("ul")
+
+        let last
+        const update = query => {
+            if (normalize) {
+                query = normalize(query)
+            }
+            if (query === last) {
+                return
+            }
+            const ws = Array.from(new Set(autocomplete ? autocomplete(query) : [])).sort((a, b) => {
+                return a.length - b.length || b.localeCompare(a)
+            })
+            for (let i = 0; i < ws.length; i++) {
+                const li = i < ul.children.length
+                    ? ul.children[i] // reuse where possible
+                    : ul.appendChild(document.createElement("li"))
+                li.tabindex = -1
+                li.dataset.term = ws[i]
+                li.textContent = ws[i] // TODO: show source dicts? ws.get(sws[i])
+            }
+            for (let i = ul.children.length-1; i >= ws.length; i--) {
+                ul.children[i].remove()
+            }
+            if (ul.children.length) {
+                ul.children[0].scrollIntoView?.({behavior: "instant", block: "nearest", inline: "nearest"})
+            }
+        }
+
+        // handle the enter key
+        input.addEventListener("keypress", event => {
+            if (event.keyCode == 13) {
+                event.preventDefault()
+                event.stopPropagation()
+                if (search) {
+                    search(acInput.value)
+                }
+            }
+        }, true)
+
+        // handle an autocomplete entry
+        ul.addEventListener("click", event => {
+            event.preventDefault()
+            event.stopPropagation()
+            if (event.target?.dataset?.term && search) {
+                search(event.target.dataset.term)
+            }
+        }, true)
+
+        // handle input
+        // note: I would use the input event, but this is more reliable across devices
+        const interval = window.setInterval(() => {
+            if (!input.isConnected) {
+                window.clearInterval(interval)
+                return
+            }
+            update(input.value)
+        }, 250)
+    }
+
     const settings = {
         dict_disabled: 'LithiumApp' in globalThis ? globalThis.LithiumApp.getDictDisabled().split(" ") : [],
         dict_show_examples: 'LithiumApp' in globalThis ? globalThis.LithiumApp.getDictShowExamples() : true,
@@ -497,6 +623,95 @@ var Dictionary = (function() {
     }
 
     const dictPopup = new Popup(`
+        nav.toolbar {
+            display: flex;
+            white-space: nowrap;
+            position: fixed;
+            top: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        nav.toolbar > button {
+            appearance: none;
+            border: 0;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            color: inherit;
+            background: none;
+            border-radius: 0;
+            outline: 0;
+            line-height: 1;
+        }
+        nav.toolbar > button {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 0 0 auto;
+            padding: 8px;
+        }
+        nav.toolbar > button:hover {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        nav.toolbar > button:active {
+            background: rgba(0, 0, 0, 0.15);
+        }
+        nav.toolbar > button > svg {
+            flex: 0 0 auto;
+            fill: currentColor;
+            height: 16px;
+            width: 16px;
+        }
+        nav.toolbar > button.close {
+            display: none;
+        }
+        aside.lookup {
+            display: none;
+        }
+        aside.lookup > input {
+            appearance: none;
+            border: 0;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            color: inherit;
+            background: none;
+            border-radius: 0;
+            outline: 0;
+            line-height: 1;
+        }
+        aside.lookup > input {
+            display: block;
+            width: 100%;
+            position: sticky;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 8px;
+            font-weight: inherit;
+            background: var(--popup-background);
+            border-bottom: 1px solid var(--popup-border-color);
+        }
+        aside.lookup > ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            text-indent: 0;
+        }
+        aside.lookup > ul > li {
+            display: block;
+            padding: 0 8px;
+            line-height: 2.25;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        aside.lookup > ul > li:hover {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        aside.lookup > ul > li:active {
+            background: rgba(0, 0, 0, 0.15);
+        }
         section {
             padding: 8px;
             border-top: 1px solid rgba(128,128,128,0.4);
@@ -617,17 +832,102 @@ var Dictionary = (function() {
         let dictSem // promise
         let dictClientRect // function -> rect
 
-        const lookup = (txt, deep) => {
+        const controller = new SelectionController()
 
-            // set the initial popup contents
+        const lookup = (txt, deep, query) => {
+
+            // set the initial popup
             const tt = Dictionary.normalize(txt)
-            const el = dictPopup.replace(render(tt, "Loading."))
+            const pw = dictPopup.replace(html`
+                <nav class="toolbar">
+                    <button class="lookup">${matIconSearch}</button>
+                    <button class="close">${matIconClose}</button>
+                </nav>
+                <aside class="lookup">
+                    <input type="text" autocomplete="off" placeholder="Search dictionary..."/>
+                    <ul></ul>
+                </aside>
+            `)
+
+            // allow expanding the popup by clicking on a header
+            pw.addEventListener("click", event => {
+                if (!event.target || (event.target.tagName.toLowerCase() != "HEADER" && Array.from(event.target.parentElement.querySelectorAll("header *")).indexOf(event.target) == -1))
+                    return
+                event.preventDefault()
+                event.stopPropagation()
+                dictPopup.expand()
+                controller.clear()
+                pw.querySelector("button.close").style.display = "block"
+            }, true)
+
+            // handle the lookup button
+            pw.querySelector("button.lookup").addEventListener("click", event => {
+                event.preventDefault()
+                event.stopPropagation()
+                pw.querySelector("aside.lookup").style.display = "block"
+                pw.querySelector("button.lookup").style.display = "none"
+                pw.querySelector("button.close").style.display = "block"
+                pw.querySelector("main").style.display = "none"
+                dictPopup.expand()
+                controller.clear()
+                if (query?.length) {
+                    pw.querySelector("aside.lookup > input").value = query
+                } else {
+                    pw.querySelector("aside.lookup > input").focus()
+                }
+            }, true)
+
+            // handle the close button
+            pw.querySelector("button.close").addEventListener("click", event => {
+                event.preventDefault()
+                event.stopPropagation()
+                dictPopup.hide()
+            }, true)
+
+            // don't let the autocomplete trigger the expand/lookup or gestures
+            pw.querySelector("aside.lookup").addEventListener("click", event => {
+                event.preventDefault()
+                event.stopPropagation()
+            }, false)
+
+            // initialize the autocomplete
+            const acDicts = []
+            createAutocompleteSearch(pw.querySelector("aside.lookup"),
+                query => Dictionary.normalize(query),
+                query => {
+                    const ws = new Map()
+                    if (query.length >= 2) {
+                        for (const x of acDicts) {
+                            for (const w of x.d.autocomplete(query, 15, true)) {
+                                let src = ws.get(w)
+                                if (src === undefined) {
+                                    src = new Set()
+                                    ws.set(w, src)
+                                }
+                                src.add(x.n)
+                            }
+                        }
+                    }
+                    return ws.keys() // TODO: include the dict source?
+                },
+                term => {
+                    lookup(term, true, pw.querySelector("aside.lookup > input").value.trim())
+                },
+            )
+
+            // render the contents
+            const el = document.createElement("main")
+            el.innerHTML = render(tt, "Loading.")
+            pw.appendChild(el)
 
             // show the popup
             if (dictPopup.show(false, dictClientRect) || deep) {
 
                 // if we're not modifying an existing selection (or it's a deep selection), discard the old semaphore
                 dictSem = Promise.resolve()
+            }
+            if (dictPopup.expanded) {
+                pw.querySelector("button.close").style.display = "block"
             }
 
             // wait for the selection to settle
@@ -653,6 +953,7 @@ var Dictionary = (function() {
                                 } catch (ex) {
                                     throw new Error(`load ${n}: ${ex}`)
                                 }
+                                acDicts.push({n, d})
                                 try {
                                     var r = await d.query(tt, true)
                                 } catch (ex) {
@@ -683,7 +984,6 @@ var Dictionary = (function() {
             }, deep ? 0 : 50)
         }
 
-        const controller = new SelectionController()
         controller.rangeValidate = rng => {
             const txt = rng.toString()
             if (txt.length < 1) {
@@ -705,7 +1005,9 @@ var Dictionary = (function() {
             }
 
             // hide the popup
-            dictPopup.hide()
+            if (!dictPopup.expanded) {
+                dictPopup.hide()
+            }
         }
         controller.rangeSelected = rng => {
             // clear the settle timer
@@ -718,7 +1020,9 @@ var Dictionary = (function() {
             dictClientRect = () => rng.getBoundingClientRect()
 
             // do the lookup
-            lookup(rng.toString(), false)
+            if (!dictPopup.expanded) {
+                lookup(rng.toString(), false)
+            }
         }
         controller.rangeSelectedDeep = (rng, anchorNode) => {
             const re = /^\w*$/
