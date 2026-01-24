@@ -48,17 +48,16 @@ func init() {
 		"smali/com/faultexception/reader/content/BookView.smali",
 		"smali/com/faultexception/reader/content/ContentView.smali",
 	},
-	ReplaceStringPrepend(
-	`.end class`,
-	FixIndent("\n"+`
-		.method public setHyphenation(Z)V
-			.locals 0
-			return-void
-		.end method
-	`),
-   ),
+	ReplaceStringAppend(
+		"", // ← END-OF-FILE (always exists)
+		FixIndent("\n"+`
+			.method public setHyphenation(Z)V
+				.locals 0
+				return-void
+			.end method
+		`),
+	),
 ),
-
 		/* ---------------- HtmlContentView forwarding ---------------- */
 
 		PatchFile("smali/com/faultexception/reader/content/HtmlContentView.smali",
