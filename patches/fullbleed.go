@@ -16,26 +16,13 @@ func init() {
 		),
 		PatchFile("smali/com/faultexception/reader/ReaderActivity.smali",
 			InMethod("setTheme(Lcom/faultexception/reader/themes/Theme;)V",
-				ReplaceStringAppend(
-					FixIndent("\n"+`
-						.line 1329
-						iget v1, p1, Lcom/faultexception/reader/themes/Theme;->backgroundColor:I
-
-						or-int/2addr v1, v0
-
-						goto :goto_0
-
-						:cond_0
-						const/4 v1, -0x1
-
-						.line 1330
-						:goto_0
-					`),
-					FixIndent("\n"+`
-						invoke-direct {p0, v1}, Lcom/faultexception/reader/ReaderActivity;->maybeSetDisplayCutoutBackground(I)V
-					`),
-				),
-			),
+	ReplaceStringAppend(
+		"\n"+`iget v1, p1, Lcom/faultexception/reader/themes/Theme;->backgroundColor:I`,
+		FixIndent("\n"+`
+			invoke-direct {p0, v1}, Lcom/faultexception/reader/ReaderActivity;->maybeSetDisplayCutoutBackground(I)V
+		`),
+	),
+),
 			ReplaceStringPrepend(
 				FixIndent("\n"+`
 				.method public setTheme(Lcom/faultexception/reader/themes/Theme;)V
