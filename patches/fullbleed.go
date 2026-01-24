@@ -15,10 +15,6 @@ func init() {
 			),
 		),
 		PatchFile("smali/com/faultexception/reader/ReaderActivity.smali",
-			InMethod("onCreate(Landroid/os/Bundle;)V",
-	// method still exists; no fragile instruction matching
-	MustContain("\n"+`.method`),
-),
 			InMethod("setTheme(Lcom/faultexception/reader/themes/Theme;)V",
 				ReplaceStringAppend(
 					FixIndent("\n"+`
