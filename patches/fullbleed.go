@@ -8,30 +8,28 @@ import . "github.com/pgaskin/lithiumpatch/patches/patchdef"
 
 func init() {
 	Register("fullbleed",
+
+		// Preference toggle
 		PatchFile("res/xml/preferences.xml",
 			ReplaceStringAppend(
 				"\n"+`    <SwitchPreferenceCompat android:title="@string/pref_fullscreen_title" android:key="fullscreen" android:defaultValue="true" />`,
 				"\n"+`    <SwitchPreferenceCompat android:title="Fullscreen reading full-bleed" android:key="fullscreen_bleed" android:defaultValue="true" />`,
 			),
 		),
+
+		// ReaderActivity hooks
 		PatchFile("smali/com/faultexception/reader/ReaderActivity.smali",
-			InMethod("setTheme(Lcom/faultexception/reader/themes/Theme;)V",
-	ReplaceStringAppend(
-		"\n"+`iget v1, p1, Lcom/faultexception/reader/themes/Theme;->backgroundColor:I`,
-		FixIndent("\n"+`
-			invoke-direct {p0, v1}, Lcom/faultexception/reader/ReaderActivity;->maybeSetDisplayCutoutBackground(I)V
-		`),
-	),
-),
+
+			// Inject helper method BEFORE setTheme
 			ReplaceStringPrepend(
 				FixIndent("\n"+`
 				.method public setTheme(Lcom/faultexception/reader/themes/Theme;)V
 				`),
 				FixIndent("\n"+`
-				.method private maybeSetDisplayCutoutBackground(I)V
+				.method private maybeSetDisplayCutoutBackgroundFromTheme(Lcom/faultexception/reader/themes/Theme;)V
 					.locals 3
 
-					# only if fullscreen active
+					# only if fullscreen enabled
 					iget-boolean v0, p0, Lcom/faultexception/reader/ReaderActivity;->mFullscreenEnabled:Z
 					if-eqz v0, :end
 
@@ -44,31 +42,29 @@ func init() {
 					move-result v0
 					if-eqz v0, :end
 
-					# reader content cutout frame
-					sget v0, Lcom/faultexception/reader/R$id;->content_high_cutout_frame:I
-					invoke-virtual {p0, v0}, Lcom/faultexception/reader/ReaderActivity;->findViewById(I)Landroid/view/View;
-					move-result-object v0
-					check-cast v0, Lcom/faultexception/reader/widget/DisplayCutoutFrameLayout;
-					invoke-virtual {v0, p1}, Lcom/faultexception/reader/widget/DisplayCutoutFrameLayout;->setInsetCutoutColor(I)V
+					# get theme background color
+					iget v0, p1, Lcom/faultexception/reader/themes/Theme;->backgroundColor:I
+					invoke-direct {p0, v0}, Lcom/faultexception/reader/ReaderActivity;->maybeSetDisplayCutoutBackground(I)V
 
-					# reader content frame
-					sget v0, Lcom/faultexception/reader/R$id;->content_high_frame:I
-					invoke-virtual {p0, v0}, Lcom/faultexception/reader/ReaderActivity;->findViewById(I)Landroid/view/View;
-					move-result-object v0
-					check-cast v0, Lcom/faultexception/reader/widget/SystemBarsFrame;
-					invoke-virtual {v0, p1}, Lcom/faultexception/reader/widget/SystemBarsFrame;->setSystemBarsBackgroundColor(I)V
-
-					# reader content loading
-					iget-object v0, p0, Lcom/faultexception/reader/ReaderActivity;->mBookContainerView:Lcom/faultexception/reader/widget/DisplayCutoutFrameLayout;
-					if-eqz v0, :end
-					invoke-virtual {v0, p1}, Lcom/faultexception/reader/widget/DisplayCutoutFrameLayout;->setInsetCutoutColor(I)V
-
-					:end
+				:end
 					return-void
 				.end method
 				`),
 			),
+
+			// Call helper at END of setTheme (safe anchor)
+			InMethod("setTheme(Lcom/faultexception/reader/themes/Theme;)V",
+				ReplaceStringAppend(
+					"\n"+`return-void`,
+					FixIndent("\n"+`
+						invoke-direct {p0, p1}, Lcom/faultexception/reader/ReaderActivity;->maybeSetDisplayCutoutBackgroundFromTheme(Lcom/faultexception/reader/themes/Theme;)V
+						return-void
+					`),
+				),
+			),
 		),
+
+		// DisplayCutoutFrameLayout helper
 		PatchFile("smali/com/faultexception/reader/widget/DisplayCutoutFrameLayout.smali",
 			ReplaceStringPrepend(
 				FixIndent("\n"+`
@@ -85,7 +81,7 @@ func init() {
 					invoke-direct {v0, p1}, Landroid/graphics/drawable/ColorDrawable;-><init>(I)V
 					iput-object v0, p0, Lcom/faultexception/reader/widget/DisplayCutoutFrameLayout;->mColor:Landroid/graphics/drawable/ColorDrawable;
 
-					:end
+				:end
 					return-void
 				.end method
 				`),
