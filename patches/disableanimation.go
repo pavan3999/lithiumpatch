@@ -7,84 +7,104 @@ import . "github.com/pgaskin/lithiumpatch/patches/patchdef"
 
 func init() {
 	Register("disableanimation",
+
+		// -----------------------------
+		// Preference toggle
+		// -----------------------------
 		PatchFile("res/xml/preferences.xml",
 			ReplaceStringAppend(
 				"\n"+`    <PreferenceCategory android:title="@string/pref_category_navigation">`,
 				"\n"+`        <SwitchPreferenceCompat android:title="Disable page turn animation" android:key="no_page_turn_animation" android:defaultValue="false" />`,
 			),
 		),
+
+		// -----------------------------
+		// HtmlContentWebView
+		// -----------------------------
 		PatchFile("smali/com/faultexception/reader/content/HtmlContentWebView.smali",
+
+			// add field + init method
 			ReplaceStringAppend(
 				"\n"+`.field private mUrl:Ljava/lang/String;`,
 				FixIndent("\n"+`
-				.field private mNoPageTurnAnimation:Z
+					.field private mNoPageTurnAnimation:Z
 
-				.method private initNoPageTurnAnimation(Landroid/content/Context;)V
-					.locals 3
+					.method private initNoPageTurnAnimation(Landroid/content/Context;)V
+						.locals 3
 
-					invoke-static {p1}, Landroid/preference/PreferenceManager;->getDefaultSharedPreferences(Landroid/content/Context;)Landroid/content/SharedPreferences;
-					move-result-object v0
+						invoke-static {p1}, Landroid/preference/PreferenceManager;->getDefaultSharedPreferences(Landroid/content/Context;)Landroid/content/SharedPreferences;
+						move-result-object v0
 
-					const-string v1, "no_page_turn_animation"
-					const/4 v2, 0x0
-					invoke-interface {v0, v1, v2}, Landroid/content/SharedPreferences;->getBoolean(Ljava/lang/String;Z)Z
-					move-result v1
+						const-string v1, "no_page_turn_animation"
+						const/4 v2, 0x0
+						invoke-interface {v0, v1, v2}, Landroid/content/SharedPreferences;->getBoolean(Ljava/lang/String;Z)Z
+						move-result v1
 
-					iput-boolean v1, p0, Lcom/faultexception/reader/content/HtmlContentWebView;->mNoPageTurnAnimation:Z
+						iput-boolean v1, p0, Lcom/faultexception/reader/content/HtmlContentWebView;->mNoPageTurnAnimation:Z
 
-					return-void
-				.end method
+						return-void
+					.end method
 				`),
 			),
+
+			// call init method in constructor
 			InMethod("<init>(Landroid/content/Context;Lcom/faultexception/reader/content/ContentView$ContentClient;Lcom/faultexception/reader/book/EPubBook;)V",
 				ReplaceStringAppend(
 					"\n"+"    invoke-direct {p0, p1}, Landroid/webkit/WebView;-><init>(Landroid/content/Context;)V",
 					"\n"+"    invoke-direct {p0, p1}, Lcom/faultexception/reader/content/HtmlContentWebView;->initNoPageTurnAnimation(Landroid/content/Context;)V",
 				),
 			),
-			InMethod("setPage(IZ)V", // the second argument is true if animating
-				ReplaceStringAppend(
-					`    .locals 5`,
-					FixIndent("\n"+`
-						iget-boolean v0, p0, Lcom/faultexception/reader/content/HtmlContentWebView;->mNoPageTurnAnimation:Z
-						if-eqz v0, :page_turn_animation_ok
-						const/4 p2, 0x0
-						:page_turn_animation_ok
-					`),
-				),
+
+			// FIXED: Lithium 0.24.6.1 compatible patch
+			// No `.locals` matching, inject at method level
+			InMethod("setPage(IZ)V", // p2 == animate
+				ReplaceMethodBody(FixIndent("\n"+`
+					.registers 6
+
+					iget-boolean v0, p0, Lcom/faultexception/reader/content/HtmlContentWebView;->mNoPageTurnAnimation:Z
+					if-eqz v0, :animation_ok
+					const/4 p2, 0x0
+					:animation_ok
+				`)),
 			),
 		),
+
+		// -----------------------------
+		// OverScrollView
+		// -----------------------------
 		PatchFile("smali/com/faultexception/reader/widget/OverScrollView.smali",
+
 			ReplaceStringAppend(
 				"\n"+`.field private mVerticalRestricted:Z`,
 				FixIndent("\n"+`
-				.field private mNoPageTurnAnimation:Z
+					.field private mNoPageTurnAnimation:Z
 
-				.method private initNoPageTurnAnimation(Landroid/content/Context;)V
-					.locals 3
+					.method private initNoPageTurnAnimation(Landroid/content/Context;)V
+						.locals 3
 
-					invoke-static {p1}, Landroid/preference/PreferenceManager;->getDefaultSharedPreferences(Landroid/content/Context;)Landroid/content/SharedPreferences;
-					move-result-object v0
+						invoke-static {p1}, Landroid/preference/PreferenceManager;->getDefaultSharedPreferences(Landroid/content/Context;)Landroid/content/SharedPreferences;
+						move-result-object v0
 
-					const-string v1, "no_page_turn_animation"
-					const/4 v2, 0x0
-					invoke-interface {v0, v1, v2}, Landroid/content/SharedPreferences;->getBoolean(Ljava/lang/String;Z)Z
-					move-result v1
+						const-string v1, "no_page_turn_animation"
+						const/4 v2, 0x0
+						invoke-interface {v0, v1, v2}, Landroid/content/SharedPreferences;->getBoolean(Ljava/lang/String;Z)Z
+						move-result v1
 
-					iput-boolean v1, p0, Lcom/faultexception/reader/widget/OverScrollView;->mNoPageTurnAnimation:Z
+						iput-boolean v1, p0, Lcom/faultexception/reader/widget/OverScrollView;->mNoPageTurnAnimation:Z
 
-					return-void
-				.end method
+						return-void
+					.end method
 				`),
 			),
+
 			InMethod("<init>(Landroid/content/Context;Landroid/util/AttributeSet;)V",
 				ReplaceStringAppend(
 					"\n"+"    invoke-direct {p0, p1, p2}, Landroid/widget/FrameLayout;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;)V",
 					"\n"+"    invoke-direct {p0, p1}, Lcom/faultexception/reader/widget/OverScrollView;->initNoPageTurnAnimation(Landroid/content/Context;)V",
 				),
 			),
+
 			InMethod("doOverScroll(I)V",
-				// this is a terrible hack, but it works well enough and reduces code duplication
 				MustContain(FixIndent("\n"+`
 					.line 196
 					:goto_0
@@ -99,6 +119,7 @@ func init() {
 					.line 207
 					iget-object v0, p0, Lcom/faultexception/reader/widget/OverScrollView;->mOverScrollPullAnimation:Landroid/animation/ValueAnimator;
 				`)),
+
 				ReplaceStringPrepend(
 					"\n"+`    .line 207`,
 					FixIndent("\n"+`
