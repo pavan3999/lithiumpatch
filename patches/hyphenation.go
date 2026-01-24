@@ -44,25 +44,20 @@ func init() {
 		/* ---------------- BookView / ContentView stubs ---------------- */
 
 		PatchFiles(
-			[]string{
-				"smali/com/faultexception/reader/content/BookView.smali",
-				"smali/com/faultexception/reader/content/ContentView.smali",
-			},
-			ReplaceStringPrepend(
-				FixIndent("\n"+`
-				.method public setTextAlign(I)V
-					.locals 0
-					return-void
-				.end method
-				`),
-				FixIndent("\n"+`
-				.method public setHyphenation(Z)V
-					.locals 0
-					return-void
-				.end method
-				`),
-			),
-		),
+	[]string{
+		"smali/com/faultexception/reader/content/BookView.smali",
+		"smali/com/faultexception/reader/content/ContentView.smali",
+	},
+	ReplaceStringPrepend(
+		"\n"+`.end class`,
+		FixIndent("\n"+`
+			.method public setHyphenation(Z)V
+				.locals 0
+				return-void
+			.end method
+		`),
+	),
+),
 
 		/* ---------------- HtmlContentView forwarding ---------------- */
 
