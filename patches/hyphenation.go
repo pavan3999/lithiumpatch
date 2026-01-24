@@ -49,14 +49,14 @@ func init() {
 		"smali/com/faultexception/reader/content/ContentView.smali",
 	},
 	ReplaceStringPrepend(
-		"\n"+`.end class`,
-		FixIndent("\n"+`
-			.method public setHyphenation(Z)V
-				.locals 0
-				return-void
-			.end method
-		`),
-	),
+	`.end class`,
+	FixIndent("\n"+`
+		.method public setHyphenation(Z)V
+			.locals 0
+			return-void
+		.end method
+	`),
+   ),
 ),
 
 		/* ---------------- HtmlContentView forwarding ---------------- */
