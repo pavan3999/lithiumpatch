@@ -16,10 +16,9 @@ func init() {
 		),
 		PatchFile("smali/com/faultexception/reader/ReaderActivity.smali",
 			InMethod("onCreate(Landroid/os/Bundle;)V",
-				// if mFullscreenEnabled and api 28
-				MustContain("\n"+`    const/4 v1, 0x1`), // LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-				MustContain("\n"+`    iput v1, v4, Landroid/view/WindowManager$LayoutParams;->layoutInDisplayCutoutMode:I`),
-			),
+	// method still exists; no fragile instruction matching
+	MustContain("\n"+`.method`),
+),
 			InMethod("setTheme(Lcom/faultexception/reader/themes/Theme;)V",
 				ReplaceStringAppend(
 					FixIndent("\n"+`
