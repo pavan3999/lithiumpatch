@@ -54,14 +54,13 @@ func init() {
 
 			// Call helper at END of setTheme (safe anchor)
 			InMethod("setTheme(Lcom/faultexception/reader/themes/Theme;)V",
-				ReplaceStringAppend(
-					"\n"+`return-void`,
-					FixIndent("\n"+`
-						invoke-direct {p0, p1}, Lcom/faultexception/reader/ReaderActivity;->maybeSetDisplayCutoutBackgroundFromTheme(Lcom/faultexception/reader/themes/Theme;)V
-						return-void
-					`),
-				),
-			),
+	ReplaceStringAppend(
+		"\n",
+		FixIndent("\n"+`
+			invoke-direct {p0, p1}, Lcom/faultexception/reader/ReaderActivity;->maybeSetDisplayCutoutBackgroundFromTheme(Lcom/faultexception/reader/themes/Theme;)V
+		`),
+	),
+),
 		),
 
 		// DisplayCutoutFrameLayout helper
