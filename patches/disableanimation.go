@@ -58,15 +58,17 @@ func init() {
 			// FIXED: Lithium 0.24.6.1 compatible patch
 			// No `.locals` matching, inject at method level
 			InMethod("setPage(IZ)V", // p2 == animate
-				ReplaceMethodBody(FixIndent("\n"+`
-					.registers 6
-
-					iget-boolean v0, p0, Lcom/faultexception/reader/content/HtmlContentWebView;->mNoPageTurnAnimation:Z
-					if-eqz v0, :animation_ok
-					const/4 p2, 0x0
-					:animation_ok
-				`)),
-			),
+	ReplaceStringPrepend(
+		"\n"+`.method public setPage(IZ)V`,
+		FixIndent("\n"+`
+			.method public setPage(IZ)V
+				iget-boolean v0, p0, Lcom/faultexception/reader/content/HtmlContentWebView;->mNoPageTurnAnimation:Z
+				if-eqz v0, :page_turn_animation_ok
+				const/4 p2, 0x0
+				:page_turn_animation_ok
+		`),
+	),
+),
 		),
 
 		// -----------------------------
