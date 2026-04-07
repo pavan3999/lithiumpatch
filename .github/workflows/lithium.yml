@@ -8,6 +8,7 @@ jobs:
   patch:
     name: patch
     runs-on: ubuntu-22.04
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
